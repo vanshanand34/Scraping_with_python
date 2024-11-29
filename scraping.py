@@ -6,50 +6,52 @@ import json
 from bs4 import BeautifulSoup
 
 
-def getData(myurl):
-    print(myurl)
-    links = []
-    images = []
-    text = ""
-    myhtml = requests.get(myurl).text
-    parser = BeautifulSoup(myhtml, "html.parser")
-    for link in parser.find_all(
-        "a", attrs={"href": re.compile("^https://")}
-    ):  # extracting all the href links
-        links.append(link.get("href"))
-    for img in parser.find_all(
-        "img", attrs={"src": re.compile(".png")}
-    ):  # extracting image sources
-        images.append(img.get("src"))
-    try:
-        text = parser.find("body").text
-        text = re.sub("[\n]+", "\n", text)  # extracting text from body tag of html
-    except AttributeError:
+class Extract:
+    """
+    This class is used to extract data from a given url
+    """
+    def extract_data_from_url(self, url: str):
         text = ""
-    return links, images, text
+        html_text = requests.get(url).text
+        parser = BeautifulSoup(html_text, "html.parser")
+        links = [
+            link.get("href")
+            for link in parser.find_all("a", attrs={"href": re.compile("^https://")})
+        ]
 
+        images = [
+            img.get("src")
+            for img in parser.find_all("img", attrs={"src": re.compile(".png")})
+        ]
+
+        try:
+            text = parser.find("body").text
+            text = re.sub("[\n]+", "\n", text)  # extracting text from body tag of html
+        except AttributeError:
+            text = ""
+        return links, images, text
 
 worksheet = openpyxl.load_workbook("Scrapping.xlsx")
 obj = worksheet.active
 res = []
-mylinks = []
-maxrow = obj.max_row
-maxcol = obj.max_column
-print(maxcol, maxrow)
-for i in range(1, maxrow + 1):
-    for j in range(1, maxcol + 1):
-        cell = obj.cell(row=i, column=j)
-        mylinks.append(
-            str(cell.value)
-        )  # extracting the urls from the given excel sheet
+max_row = obj.max_row
+max_col = obj.max_column
+print(max_col, max_row)
+
+all_links = [
+    str(obj.cell(row=i, column=j).value)
+    for i in range(1, max_row + 1)
+    for j in range(1, max_col + 1)
+]
 
 
-# extracting urls , images and text from each url given in the excell sheet and storing the data in a python dictionary
-for i in mylinks:
-    links, images, text = getData(i)
-    res.append({"WebPageLink": i, "urls": links, "images": images, "text": text})
+# extracting urls , images and text from each url given in the excell sheet 
+# and storing the data in a python dictionary
+for link in all_links:
+    links, images, text = Extract().extract_data_from_url(link)
+    res.append({"WebPageLink": link, "urls": links, "images": images, "text": text})
 res = {"data": res}
 
 # converting and storing data in the form of a json file
-with open("myfile.json", "w") as f:
+with open("res_file.json", "w", encoding="utf-8") as f:
     json.dump(res, f)
